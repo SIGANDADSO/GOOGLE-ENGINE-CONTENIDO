@@ -1,0 +1,104 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var modis09 = ee.ImageCollection("MODIS/061/MOD09A1"),
+    tm = ee.ImageCollection("LANDSAT/LT05/C02/T1"),
+    msi = ee.ImageCollection("COPERNICUS/S2_HARMONIZED"),
+    naip = ee.ImageCollection("USDA/NAIP/DOQQ");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+
+/* Usaremos la resolucion espacial para cada satélite y ver su importancia*/
+// Concepto clave:
+/*Resolucion espacial:La resolución espacial se refiere a la cantidad de superficie
+terrestre cubierta por un solo píxel*/
+/*decir que Landsat 7 tiene imágenes en color de “30 m”.
+Esto significa que cada píxel mide 
+30 m de lado, cubriendo un área total de 900 m² de 
+la superficie terrestre*/
+
+// Analizaremos ahora los satélites
+
+/*MODIS((on the Aqua and Terra satellites)* con 500 m resolution, es decir, cada
+pixel con un área 0,25km2 en la superficie
+*/ 
+
+// Define a region of interest as a point at San Francisco airport
+var localizacion= ee.Geometry.Point([-122.3774, 37.6194]);
+Map.centerObject(localizacion, 16);
+/*aplicaremos algunos ajustes al MODIS para ver resolusion espacial*/
+var filttarLocalizacion = modis09.filterDate('2020-02-01', '2020-03-01')
+                          .first();
+var parametrosVisual = {
+          modisBands: ['sur_refl_b02', 'sur_refl_b01', 'sur_refl_b04'],
+           min:0,
+           max: 3000
+}
+//mostrar en mapa
+Map.addLayer(filttarLocalizacion,parametrosVisual, 'San Francisco airport MODIS' )
+
+/*Obtén la escala de los datos a partir de la proyección de la banda NIR*/
+/*usamos la función nominalScale aquí después de acceder a la información de proyección de la banda NIR de MODIS*/
+
+var revisarEscala = filttarLocalizacion.select('sur_refl_b02')
+                    .projection().nominalScale();
+print('Modis NIR escala: ',revisarEscala ) // escala se expresa en metros
+
+/*La función nominalScale devuelve un valor ligeramente inferior a la resolución
+indicada de 500 m debido a la proyección sinusoidal de los datos MODIS y a la 
+distancia del píxel desde el nadir, es decir, donde el satélite apunta directamente
+hacia la superficie de la Tierra.*/
+
+/*aplicaremos sensores Thematic Mapper (tm) que es landsat, que usaremos Landsat 5 TM a 30 metros de resolución 
+//Filtrar imágenes TM por ubicación y fecha//
+//.filterBounds(Map.getCenter()) sirve para filtrar una colección de imágenes y quedarte 
+//solo con aquellas que cubren el punto central del mapa en tu sesión de Earth Engine//*/
+var tmImage = tm
+              .filterBounds(Map.getCenter())
+              .filterDate('1987-03-01', '1987-08-01')
+              .first();
+var parametrosTm = {
+          bands: ['B4', 'B3', 'B2'],
+          min:0,
+          max:100
+  };
+// Mostrar mapa
+Map.addLayer(tmImage,parametrosTm, 'falso color TM' );
+ // ahora revisemos la escala
+var escalaTm = tmImage.select('B4')
+               .projection().nominalScale();
+print('TM NIR escala: ',escalaTm );
+
+/*aplicamos El Instrumento Multiespectral (MSI) de Sentinel-2 satellites)*/
+var msiIamgen = msi
+               .filterBounds(Map.getCenter())
+               .filterDate('2020-02-01', '2020-04-01')
+               .first();
+var parametrosMsi = {
+         bands: ['B8','B4','B3'],
+         min:0,
+         max:3000
+  };
+// Mostrar mapa
+Map.addLayer(msiIamgen, parametrosMsi,'falso color msi' )
+
+ // ahora revisemos la escala
+var escalaMsi = msiIamgen.select('B8')
+              .projection().nominalScale();
+print('MSI NIR escala: ', escalaMsi); // escala en metros 
+
+/*Aplicamos  El Programa Nacional de Imágenes Agrícolas (NAIP)
+lo pixeles teinen resolución espacial de 0,5 a 2 m */
+
+var naiImage = naip
+              .filterBounds(Map.getCenter())
+              .filterDate('2018-01-01', '2018-12-31')
+              .first()
+var parametrosNaip ={
+          bands: ['N', 'R', 'G']
+}
+
+// Mostrar mapa
+Map.addLayer(naiImage,parametrosNaip , 'falso color NAIP' );
+// ahora revisemos la escala
+var escalaNaip = naiImage .select('N')
+               .projection().nominalScale();
+print('NAIP NIR escala: ', escalaNaip );
+

@@ -1,0 +1,14 @@
+var lights93 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F101993')
+  .select('stable_lights').rename('1993');
+
+var lights03 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F152003')
+  .select('stable_lights').rename('2003');
+
+var lights13 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F182013')
+  .select('stable_lights').rename('2013');
+
+var changeImage = lights13.addBands(lights03).addBands(lights93);
+
+Map.centerObject(lights13, 4);
+Map.addLayer(changeImage.select('2013'), {min: 0, max: 63}, 'Luces 2013');
+Map.addLayer(changeImage.select('2003'), {min: 0, max: 63}, 'Luces 2003');

@@ -1,0 +1,62 @@
+var modis09 = ee.ImageCollection("MODIS/061/MOD09A1")
+  .filterDate('2023-01-01', '2023-12-31')
+  .filterBounds(ee.Geometry.Point([-76.268, 6.9908]));
+
+//En Earth Engine bandNames() devuelve un objeto de tipo ee.List.
+// hagamos un filtro de imagen tomando la primera válida
+var modisFirst = modis09.first(); 
+print("Fecha de la imagen usada:", modisFirst.date());
+
+// Obtener nombre de las bandas
+var modisBands = modisFirst.bandNames(); 
+print('Modis bands: ', modisBands); 
+print('Length of the bands list:', modisBands.size()); // se puede usar length() pero no es recomedable por el ee.list
+
+// Seleccionar solo las bandas de reflectancia
+var bandsReflectancia = modisFirst.select([
+  'sur_refl_b01',
+  'sur_refl_b02',
+  'sur_refl_b03',
+  'sur_refl_b04',
+  'sur_refl_b05',
+  'sur_refl_b06',
+  'sur_refl_b07'
+]);
+
+// Parámetros del gráfico
+var graficoParametro = {
+   title: 'MODIS spectrum at SFO', 
+    hAxis: { 
+        title: 'Band' 
+    }, 
+    vAxis: { 
+        title: 'Reflectance' 
+    }, 
+    legend: { 
+        position: 'none' 
+    }, 
+   pointSize: 5,                                // Tamaño de puntos
+    colors: ['#F50A0A'],   // Colores de líneas y puntos
+    lineWidth: 3,                                // Grosor de línea
+    lineDashStyle: [4, 4],                       // Línea discontinua
+    backgroundColor: '#FFFFFF',                  // Fondo del gráfico
+    dataOpacity: 0.8                             // Puntos semitransparentes (efecto borde)
+};
+
+// Punto de muestreo
+var pointZona = ee.Geometry.Point([-76.268, 6.9908]);
+
+// Crear gráfico usando ui.Chart.image.regions
+var modisReflectanceChart = ui.Chart.image.regions({
+  image: bandsReflectancia,
+  regions: pointZona,
+  reducer: ee.Reducer.mean(), //“Si la región tiene varios píxeles, saca el promedio”.
+  scale: 500
+})
+.setChartType('LineChart') //línea para conectar las bandas en orden lógico.
+.setOptions(graficoParametro);
+
+// Mostrar gráfico
+print(modisReflectanceChart);
+
+

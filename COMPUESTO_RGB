@@ -1,0 +1,37 @@
+/*compuesto de RGB*/
+var lights93 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F101993')
+              .select('stable_lights').rename('1993')
+var lights03 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F152003')
+              .select('stable_lights').rename('2003')
+
+var lights13= ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F182013')
+             .select('stable_lights').rename('2013')
+
+var adBanda = lights03. addBands(lights13).addBands(lights93);
+
+Map.addLayer(adBanda.select('1993'),{
+              min:1,
+              max:10,
+              palette: ['000000', '#C105F5', '#F59D05', '#F5F105']
+            },
+            '1993',
+            1
+);
+
+Map.addLayer(adBanda.select('2003'),{
+              min:0,
+              max:63,
+              palette: ['000000', '#C105F5', '#F59D05', '#F5F105']
+            },
+            '2003',
+            1
+);
+
+Map.addLayer(adBanda.select('2013'),{
+              min:1,
+              max:10,
+              palette: ['000000', '#C105F5', '#F59D05', '#F5F105']
+            },
+            '2013',
+            1
+);

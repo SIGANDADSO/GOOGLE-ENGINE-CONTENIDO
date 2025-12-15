@@ -1,0 +1,33 @@
+// Esto es la sitaxys básica de Javascript para empezar
+/*STRING*/
+var city = "Montería";
+print(city);
+///////
+/*VARIABLE  NUMERIC*/
+var population = 3490000;
+/*lIST: IT´S HELPFUL TO BE ABLE TO STORE MULTIPLE VALUES EN GEE*/
+
+var city_colombia= ["Montería", "Bogotá", "Medellín"];
+print(city_colombia);
+ 
+/*OBJECTS*/
+var cityColombia ={
+  'city': 'Montería',
+  'coordinates': [-75.88, 8.76],
+  'population': 230000000
+};
+print(cityColombia);
+
+/*fuctions*/
+ var geeting = function(name, y){
+    return "Hola " + name +  y
+ };
+ 
+ print(geeting('carlos', 6));
+
+
+
+
+
+
+

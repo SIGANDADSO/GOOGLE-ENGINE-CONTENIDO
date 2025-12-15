@@ -1,0 +1,226 @@
+/*Encuesta de Conjuntos de Datos Raster*/
+/*var landsat8 = ee.ImageCollection('LANDSAT/LC08/C02/T1');
+
+       
+Map.addLayer(landsat8,{
+            bands:['B4','B3', 'B2'],
+            min:5000,
+            max:15000,
+            },
+            'lANSAD 8 IMAGEN COLLETION'
+);
+// APLICAREMOS AHORA EL FILTRO DE IMAGENES CON .FILTERDATE
+
+var landsatFiltrado = ee.ImageCollection('LANDSAT/LC08/C02/T1')
+              .filterDate('2024-12-1', '2025-03-1')
+       
+Map.addLayer(landsatFiltrado ,{
+            bands:['B4','B3', 'B2'],
+            min:5000,
+            max:15000,
+            },
+            'filtro de fecha de LANDSAT 8 '
+);
+
+// FILTRO DE IMAGENES POR PUNTOS
+
+var puntoLocalizacion = ee.Geometry.Point([-116.344, 39.846 ]);
+var imagenLocalizacion = landsatFiltrado.filterBounds(puntoLocalizacion);
+Map.addLayer(imagenLocalizacion,{
+          bands:['B4','B3', 'B2'],
+          min:5000,
+            max:15000,
+         },
+         'MN Landsat 8'
+);
+// Agrega el punto al mapa para ver dónde está
+Map.addLayer(puntoLocalizacion,{}, 'PUNTO MN');
+/*el punto interseca con varias imágenes*/
+
+//SELECCIONANDO LA PRIMERA IMAGEN
+
+/*var landsatFirst= imagenLocalizacion.first();
+//Muestra la primera imagen de la colección filtrada.
+Map.centerObject( landsatFirst, 7)
+Map.addLayer(landsatFirst, {
+          bands:['B4','B3', 'B2'],
+          min:5000,
+            max:15000,
+         },
+         'First Landsat 8'
+);
+
+//NOTA:
+
+/*.filterDate() → filtra por rango de fechas.
+
+.filterBounds() → filtra por ubicación (intersección espacial).
+*/
+
+
+////////////////////////////////////////////////////////////
+
+// AHORA PONDREMOS EN PRÁCTICA LOS ANTERIOR
+
+///// 
+// Collections of single images - Landsat 8 Surface Reflectance 
+//Crea un objeto de Punto de Earth Engine sobre San Francisco.
+
+/*var pointSF= ee.Geometry.Point([-122.44, 37.76]);
+
+//Importar la colección de Reflectancia Superficial de Landsat 8
+
+/*var landsat8SR= ee.ImageCollection('LANDSAT/LC08/C02/T1_L2');
+Map.addLayer(landsat8SR,{
+           bands:['SR_B4','SR_B3', 'SR_B2'],
+           min:5000,
+           max:15000
+           }, 
+           'landsat8SR'
+           )
+
+//filtar y seleccionar la imagen del punto
+var landsat8SRimage = landsat8SR.filterDate('2014-03-18', 
+        '2014-03-19') 
+    .filterBounds(pointSF) 
+    .first(); 
+ //VERIFICAR SI la colección no está vacía
+print('Landsat 8 SUPERFICIE DE REFLECTANCIA', landsat8SRimage); 
+Map.centerObject(pointSF,7);
+Map.addLayer(landsat8SRimage,{
+           bands:['SR_B4','SR_B3', 'SR_B2'],
+           min:7000,
+           max:13000
+           }, 
+           'Punto filtado'
+           );
+
+Map.addLayer(pointSF, {}, 'San Francisco'); */
+
+//Compuestos Prefabricados
+//SATELITE MODIS 
+// ESTE SATELITE PASA CADA 16 DÍAS 
+/*var modisDiario= ee.ImageCollection("MODIS/061/MCD43A4")
+                 .filterDate('2018-04-01', '2018-06-01'); 
+print(modisDiario)*/
+//cuando usas .first() en una colección, el resultado 
+//es un ee.Image, y ese tipo de objeto no puede ser usado directamente en
+//Map.centerObject() si no tiene geometría asociada.
+
+//Usa .clip() para recortar la imagen a tu zona de interés,
+//y así asegurar que tenga geometría
+ /*var localizacionPunto = ee.Geometry.Rectangle([-74.612, 8.992, -73.2777, 8.0214]);
+ var UbicacionZona = modisDiario.filterBounds(localizacionPunto). first()
+                     .clip(localizacionPunto);
+ var modisVisual= {
+   bands: [
+     'Nadir_Reflectance_Band1', 
+     'Nadir_Reflectance_Band4', 
+     'Nadir_Reflectance_Band3'],
+      min:0,
+      max:4000,
+      gamma: 1.4,
+      }
+Map.centerObject(UbicacionZona, 8)
+Map.addLayer(UbicacionZona , modisVisual, ' COLOR VERDADERO ZONA')
+Map.addLayer(modisDiario,modisVisual, 'MODIS COLOR VERDADERO MUNDIAL');
+
+
+//Áreas Quemadas Mensuales de MODIS
+var modisMensual=  ee.ImageCollection('MODIS/006/MCD64A1')
+                  .filterDate('2021-08-01');
+Map.addLayer(modisMensual,{}, 'MODIS Monthly Burn')*/
+
+//Sección 4. Otros Productos Satelitales
+/* Sentinel-5 methane dataset. */
+var datoset= ee.ImageCollection("COPERNICUS/S5P/OFFL/L3_CH4")
+             .select('CH4_column_volume_mixing_ratio_dry_air')
+             .filterDate('2018-11-28', '2018-11-29');
+var zonaEstudio = ee.Geometry.Rectangle([-4.333, 31.739,1.743, 29.871 ]);
+var zonaDelimitada= datoset .filterBounds(zonaEstudio)
+                     .first()
+                    .clip(zonaEstudio);
+var parametroVisual={
+        palette: ['black', 'blue', 'purple', 'cyan', 'green', 
+        'yellow', 'red'],
+         min:1770,
+         max: 1920 
+ };
+ 
+Map.addLayer(zonaDelimitada, parametroVisual,'CH4' );
+Map.centerObject(zonaDelimitada, 7);
+
+/*Weather and Climate Data*/
+
+var monthlyERA= ee.ImageCollection("ECMWF/ERA5/MONTHLY")
+                 .select('mean_2m_air_temperature')
+                .filterDate('2018-01-1', '2018-01-31');
+var zonaTemperatura = ee.Geometry.Rectangle([-71.954, -10.011,-62.11, -17.098]);
+var zonaObjetivo = monthlyERA. filterBounds(zonaTemperatura)
+                   .first()
+                   .clip(zonaTemperatura);
+var visualTem={
+         palette: [
+           '000080', '0000d9', '4000ff', '8000ff', '0080ff', '00ffff',
+           '00ff80', '80ff00', 'daff00', 'ffff00', 'fff500', 'ffda00',
+           'ffb000', 'ffa400', 'ff4f00', 'ff2500', 'ff0a00', 'ff00ff'],
+           min:250,
+           max:320
+};
+Map.addLayer(zonaObjetivo ,visualTem, 'Temperatura mensual');
+Map.centerObject(zonaObjetivo ,5);
+
+//Sección 5. Uso del Suelo y Cobertura del Suelo Preclasificados
+var worldCover = ee.ImageCollection("ESA/WorldCover/v100").first();
+var visualCover = { bands:['Map']};
+Map.addLayer(worldCover,visualCover, 'World Cover' );
+
+/*Global Forest Change */
+/* en este caso no se usar .first() porque es una imagen y no una colección com imageColletion*/
+var changeForestGlobal = ee.Image("UMD/hansen/global_forest_change_2024_v1_12")
+                         .select('treecover2000');
+var parametroForest = {
+           palette: ['black', 'green'],
+           min:0,
+           max:100
+};
+
+Map.addLayer(changeForestGlobal,parametroForest , 'Cobertura global');
+
+///Section 6. Other Datasets 
+
+/*Recuento de Población en Cuadrícula(Gridded Population Count )*/
+
+var poblacionConteo = ee.ImageCollection("CIESIN/GPWv411/GPW_Population_Count")
+                      .first();
+var poblacionVisual = {
+  bands: ['population_count'],
+  palettepoblacion:[  'ff0a00', 'ff00ff'],
+    min:0,
+    max:1200
+};
+Map.addLayer(poblacionConteo,poblacionVisual , 'Conteo de poblacion mundial');
+/*DEM*/
+var elevacionMundial= ee.Image("NASA/NASADEM_HGT/001")
+                       .select('elevation');
+var parametrodemVisual = {
+  min:0,
+  max:3000
+};
+
+Map.addLayer(elevacionMundial,parametrodemVisual, 'DEM MUNDIAL' );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

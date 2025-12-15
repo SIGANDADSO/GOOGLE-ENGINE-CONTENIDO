@@ -1,0 +1,15 @@
+//APIS DE ee.
+// ee.number().add() suma de dos numeros
+var a = 1;
+var b= 2;
+var result = ee.Number(a).add(b);
+print(result);
+
+// ee.list
+ var secuencia = ee.List.sequence(1980, 2020, 5);
+ print(secuencia);
+ // tarea concatenar estar variables
+var mission = ee.String('Sentinel');
+var satellite = ee.String('2A'); 
+var stringss = ee.String(mission).cat(satellite)
+print(stringss);

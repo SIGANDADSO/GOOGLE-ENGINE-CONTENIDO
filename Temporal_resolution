@@ -1,0 +1,63 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var tm = ee.ImageCollection("LANDSAT/LT05/C02/T1"),
+    msi = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+/* Concepto de Resolución temporal: Frecuencia por la que pasa el satélite.
+ El tiempo de revisita es el número de días entre visitas consecutivas 
+ del satélite a la misma ubicación en la superficie de la Tierra. Piénsalo como 
+ la frecuencia de los píxeles en una serie temporal en una ubicación determinada.*/
+ 
+// En este ejercicio revisaremos varios satélites la resolución temporal
+
+/* landsat 5 que tiene una frecuencia de cada 16 días*/
+//Usa Print para ver el tiempo de revisita de Landsat
+// Define a region of interest as a point at San Francisco airport
+var localizacion= ee.Geometry.Point([-122.3774, 37.6194]);
+Map.centerObject(localizacion, 16);
+print('Landsat-5 series:', tm 
+    .filterBounds(Map.getCenter()) 
+    .filterDate('1987-06-01', '1987-09-01'));
+
+/*Create a chart(gráfico) to see Landsat 5's 16 day revisit time.*/
+var tmChart = ui.Chart.image.series({
+          imageCollection:tm.select('B4').filterDate('1987-06-01', 
+        '1987-09-01'),
+        region: localizacion
+      }).setSeriesNames(['NIR']);
+//Define un estilo de gráfico que nos permita ver las fechas individuales
+
+var chartStyle= {
+  hAxis :{
+    title : 'Date'
+  },
+  vAxis:{
+    title: 'NIR'
+  },
+  series:{
+    0:{
+       color: '#00FF00',
+       lineWidth:4, // ancho de la linea
+       pointSize:8  // tamaño del punto
+    }
+  },
+};
+//Aplica propiedades de estilo personalizadas al gráfico.
+ tmChart.setOptions(chartStyle);
+ // Imprimir gráfico. 
+print('TM Chart', tmChart); 
+/*Cada 16 días puedes ver:
+crecimiento de cultivos,
+estrés hídrico inicial,
+recuperación después de lluvias,
+pérdida o ganancia de cobertura vegetal,
+👉 El NIR sube si la planta está sana
+👉 el NIR baja si la planta está estresada o secándose*/
+/*hagamos uno con el sentinel-2 tiene un intervalo de cada 5 dias*/
+var msiChart = ui.Chart.image.series({
+          imageCollection:msi.select('B8').filterDate('2020-06-01', 
+        '2020-09-01'),
+        region: localizacion
+      }).setSeriesNames(['NIR']);
+      
+ msiChart.setOptions(chartStyle);     
+  print('MSI Chart',  msiChart);
