@@ -1,0 +1,105 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var image = ee.ImageCollection("TERN/AET/CMRSET_LANDSAT_V2_2"),
+    modis09 = ee.ImageCollection("MODIS/061/MOD09A1");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+/*Evapotranspiración real para Australia*/
+var punto = ee.Geometry.Point([132.09, -23.02]);
+var poligono = ee.Geometry.Rectangle([124, -20.08,139.91, -28.09 ]);
+var  coleccion = image
+            .filterDate('2024-01-01', '2024-12-01')
+            .filterBounds(poligono);
+var imagen = coleccion
+            .first()
+            .clip(poligono);
+            
+var parametros ={bandas: ['ETa'],
+                 min:0, max:7};
+var resolu = imagen.select('ETa').projection().nominalScale() // Resolucion espacial
+print( resolu)
+
+var imagenChart = ui.Chart.image.series({
+          imageCollection: coleccion.select('ETa').filterDate('2024-01-01','2024-12-01'),
+          region: poligono,
+          reducer: ee.Reducer.mean(),
+          scale: 1000
+      }).setSeriesNames(['ETa']);
+//Define un estilo de gráfico que nos permita ver las fechas individuales
+
+var chartStyle= {
+  hAxis :{
+    title : 'Date'
+  },
+  vAxis:{
+    title: 'ETa'
+  },
+  series:{
+    0:{
+       color: '#00FF00',
+       lineWidth:4, // ancho de la linea
+       pointSize:8  // tamaño del punto
+    }
+  },
+};
+//Aplica propiedades de estilo personalizadas al gráfico.
+imagenChart.setOptions(chartStyle);
+print(imagenChart)
+Map.addLayer(imagen, parametros, 'EVAPOTRASPIRACION' )
+Map.centerObject(punto, 5)
+Map.addLayer(punto,{}, 'Ubicacación')
+
+/**/
+//modis09 usar en Australia
+// vamos hacer una grafica de resolución espectral
+// hacemos la coleccion de imagenes
+var modis09Coleccion = modis09
+        .filterDate('2024-01-01','2024-12-01')
+        .filterBounds(ee.Geometry.Point([132.09, -23.02]));
+ var modisFirst =  modis09Coleccion .first();
+var modisBands = modisFirst.bandNames();
+print('Lista de bandas', modisBands)
+print('Longitud de la lista', modisBands.size())
+// seleccionamos la imagen coleccion modisFirst
+var relectanciaBands = modisFirst.select([
+   'sur_refl_b01',
+   'sur_refl_b02',
+   'sur_refl_b03', 
+   'sur_refl_b04', 
+   'sur_refl_b05',
+   'sur_refl_b06',
+   'sur_refl_b07'
+]);
+// Parámetros del gráfico
+var graficoParametro = {
+   title: 'MODIS spectrum at SFO', 
+    hAxis: { 
+        title: 'Band' 
+    }, 
+    vAxis: { 
+        title: 'Reflectance' 
+    }, 
+    legend: { 
+        position: 'none' 
+    }, 
+   pointSize: 5,                                // Tamaño de puntos
+    colors: ['#F50A0A'],   // Colores de líneas y puntos
+    lineWidth: 3,                                // Grosor de línea
+    lineDashStyle: [4, 4],                       // Línea discontinua
+    backgroundColor: '#FFFFFF',                  // Fondo del gráfico
+    dataOpacity: 0.8                             // Puntos semitransparentes (efecto borde)
+};
+
+// Punto de muestreo
+var pointZona = punto;
+
+// Crear gráfico usando ui.Chart.image.regions
+var modisReflectanceChart = ui.Chart.image.regions({
+  image:  relectanciaBands,
+  regions: pointZona,
+  reducer: ee.Reducer.mean(), //“Si la región tiene varios píxeles, saca el promedio”.
+  scale: 500
+})
+.setChartType('LineChart') //línea para conectar las bandas en orden lógico.
+.setOptions(graficoParametro);
+
+// Mostrar gráfico
+print(modisReflectanceChart);

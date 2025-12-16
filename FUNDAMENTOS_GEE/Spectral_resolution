@@ -1,4 +1,10 @@
-var modis09 = ee.ImageCollection("MODIS/061/MOD09A1")
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var eo1 = ee.ImageCollection("EO1/HYPERION"),
+    modis = ee.ImageCollection("MODIS/061/MOD09A1"),
+    msi = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+/**/
+var modis09 = modis
   .filterDate('2023-01-01', '2023-12-31')
   .filterBounds(ee.Geometry.Point([-76.268, 6.9908]));
 
@@ -58,5 +64,95 @@ var modisReflectanceChart = ui.Chart.image.regions({
 
 // Mostrar gráfico
 print(modisReflectanceChart);
+
+/**/
+//Ahora comparemos el MODIS con el sensor hiperespectral del satélite EO-1.
+// Buscar “eo-1” and import the “EO-1 Hyperion Hyperspectral Imager”
+
+// filtar por fecha 
+var eoImagen = eo1
+              .filterDate('2015-01-01', '2016-01-01')
+              .filterBounds(ee.Geometry.Point([6.10, 81.12]))
+              .first();
+// buscamos las bandas por medio de una lista
+var eoBands = eoImagen.bandNames();
+print('Lista de bandas eo',eoBands)
+print('La longitud eo: ', eoBands)
+
+var eoChartopcion ={
+   title:'EO1 spectrum',
+   hAxis:{
+     title: 'Bands'
+   },
+   vAxis:{
+     title: 'Reflectance'
+   }, 
+   legend: {
+     position: 'none'
+   },
+  pointSize: 3,                                // Tamaño de puntos
+    colors: ['#F50A0A'],   // Colores de líneas y puntos
+    lineWidth: 3,                                // Grosor de línea
+    lineDashStyle: [4, 4],                       // Línea discontinua
+    backgroundColor: '#FFFFFF',                  // Fondo del gráfico
+    dataOpacity: 0.8                             // Puntos semitransparentes (efecto borde)
+};
+
+var grafico = ui.Chart.image.regions({
+                      image:eoImagen, 
+                      regions:ee.Geometry.Point([6.10, 81.12]),
+                      reducer: ee.Reducer.mean(), //“Si la región tiene varios píxeles, saca el promedio”.
+                      scale: 500
+                      }).setOptions(eoChartopcion);
+                      
+print('EO',grafico )
+
+//Calidad por píxel//
+// Sentinel-2 tiene una banda QA60, que contiene la información de aseguramiento de 
+//calidad de la reflectancia superficial. Vamos a mapearla para inspeccionar los valores.
+///// 
+// Examine pixel quality 
+///// 
+ 
+// Sentinel Quality Visualization. 
+var msiCloud = msi 
+    .filterBounds(Map.getCenter()) 
+    .filterDate('2019-12-31', '2020-02-01') 
+    .first(); 
+ 
+// Display the MSI image as a false color composite. 
+Map.addLayer(msiCloud, 
+    { 
+        bands: ['B8', 'B4', 'B3'], 
+        min: 0, 
+        max: 2000 
+    }, 
+    'MSI Quality Image');
+    
+Map.addLayer(msiCloud, 
+{ 
+bands: ['QA60'], 
+min: 0, 
+max: 2000 
+}, 
+'Sentinel Quality Visualization'); 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
