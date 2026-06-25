@@ -1,0 +1,113 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var sentinel2 = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+/*SECCIÓN 2:Umbralización, Enmascaramiento y Remapeo de Imágenes (Thresholding, Masking, and Remapping Images)*/
+//Esta sección utiliza operadores lógicos para categorizar valores de bandas o índices y así crear una imagen categorizada.
+//////1. Aplicamos un umbral usando Sentinel 2//
+
+//¿Qué es un umbral?Implementar un umbral utiliza un número (el valor del umbral) y operadores lógicos para ayudarnos a dividir la variabilidad de las imágenes en categorías.
+//Consiste en fijar un valor límite para clasificar píxeles.
+
+// ejemplo:Si queremos ver qué áreas del mapa tienen vegetación, podemos usar un umbral para generalizar el valor de NDVI en cada píxel como “sin vegetación” o “vegetación”.
+//Eso es, sin duda, una simplificación considerable,pero puede ayudarnos a comprender 
+//mejor la rica variación en la superficie de la Tierra. 
+
+/////Crear una imagen NDVI  usando Sentinel 2 para hacer el umbral.
+
+var  Seattle = ee.Geometry.MultiPoint([-122.2040, 47.6221 ]);   // ubicación de la zona de estudio
+var sentinelFiltrado = sentinel2
+                       .filterBounds(Seattle)
+                       .filter(ee.Filter.date('2020-08-15', '2020-10-01'))
+                       .first();
+var ndvi= sentinelFiltrado.normalizedDifference(['B8', 'B4']);
+var colores = [ 'red','White', 'green'];
+Map.centerObject( Seattle, 10);
+Map.addLayer(ndvi, {
+  palette: colores,
+  min:-1,
+  max:1},
+  'NDVI de Seattle');
+  
+// ahora inpecciono y veo zonas mayores y menores a 0.5 lo cual me ayudaria a usar un umbral para clasificar
+///////////////////////////////////////////////////////El método gt pertenece a la familia de operadores booleanos;
+//es decir, gt es una función que realiza una prueba en cada píxel y
+//devuelve el valor 1 si la prueba evalúa como verdadera, y 0 en caso
+//contrario. Aquí, para cada píxel en la imagen, se prueba si el valor del NDVI 
+//es mayor a 0,5. Cuando se cumple esta condición, la capa seaVeg obtiene el valor 1.
+//Cuando la condición es falsa, recibe el valor 0.
+//nota: Otros operadores en esta familia booleana incluyen menor que (lt), menor o igual que (lte), 
+//igual a (eq), distinto de (neq), y mayor o igual que (gte), entre otros.//////////////////////////////////////////////////////
+ var seaVeg =  ndvi.gt(0.5);
+ Map.addLayer(seaVeg,    // agregamos el umbral
+    { 
+        min: 0, 
+        max: 1, 
+        palette: ['white', 'green'] 
+    }, 
+    'Non-forest vs. Forest');
+//////2. Construyendo categorizaciones complejas con .where con el satélite sentinel 2//
+
+////////Un mapa binario que clasifica el NDVI es muy útil. Sin embargo, hay situaciones en las que puede que desees dividir tu imagen
+//en más de dos categorías. Earth Engine proporciona una herramienta, el método where,que es un 
+// análogo de if de javascript
+
+//Supongamos que, en lugar de simplemente separar las áreas boscosas de las no boscosas en nuestro NDVI, queremos dividir la imagen
+//en áreas probablemente de agua, no boscosas y boscosas. Podemos usar 'where' y los umbrales de -0.1 y 0.5.
+//Comenzaremos creando una imagen usando ee.Image. Luego recortaremos la nueva imagen para que cubra la misma área que nuestra capa seaNDVI.
+
+// Crear una imagen inicial con todos los valores = 1.
+var SeaWhere =  ee.Image(1)
+                .clip( ndvi.geometry()) //Usa clip para limitar el tamaño de la nueva imagen.
+// Hacer que todos los valores de NDVI menores a -0.1 sean iguales a 0.
+SeaWhere = SeaWhere.where( ndvi.lte(-0.1),0);
+// Hacer que todos los valores de NDVI mayores a 0.5 sean iguales a 2.
+SeaWhere = SeaWhere.where( ndvi.gte(0.5),2);
+// Mapear nuestra capa que ha sido dividida en tres clases.
+Map.addLayer(SeaWhere, 
+    { 
+        min: 0, 
+        max: 2, 
+        palette: ['blue', 'white', 'green'] 
+    }, 
+    'Water, Non-forest, Forest');
+
+
+//////3. Enmascarando valores específicos en una imagen con el satélite sentinel 2//
+
+////////Enmascarar una imagen es una técnica que elimina áreas específicas de una imagen, aquellas cubiertas por la máscara,
+//para que no se muestren ni se analicen. Earth Engine te permite tanto ver la máscara actual como actualizarla.
+// Implementar enmascaramiento.
+// Ver la máscara actual de la capa seaVeg.
+Map.centerObject(Seattle, 9); 
+Map.addLayer(seaVeg.mask(), {}, 'seaVeg Mask'); // el área blanca es por la cual vamos a trabajar( se muestra en el inspector el valor 1)
+
+//Ahora supongamos que solo queremos mostrar y realizar análisis en las áreas boscosas. Vamos a enmascarar las áreas no boscosas de nuestra imagen.
+//Primero, creamos una máscara binaria usando el método equals (eq).
+// Crear una máscara binaria de no bosque 
+var vegMask = seaVeg.eq(1); // el valor 1 se halló en el inspector
+// Actualizar la máscara de vegetación marina con la máscara de no-bosque.
+var maskedVeg = seaVeg.updateMask(vegMask);
+Map.addLayer(maskedVeg, 
+    { 
+        min: 0, 
+        max: 1, 
+        palette: ['green'] 
+    }, 
+    'Capa de Bosque Enmascarada'); //Puedes ver cómo la capa maskedVeg ahora ha enmascarado todas las áreas no forestadas.
+// Mapear la máscara actualizada
+Map.addLayer(maskedVeg.mask(),{}, 'máscara de vegetales enmascarada')
+
+
+//////4. Remapeando valores en una imagen con el satélite sentinel 2//
+// usaremos el metodo  remap para Solo cambia etiquetas valores de SeaWhere 
+var seaRemap = SeaWhere.remap([0, 1, 2], // valores existentes
+    [9, 11, 10]); // reasignación de valores
+ 
+Map.addLayer(seaRemap, 
+    { 
+        min: 9, 
+        max: 11,
+        palette: ['blue', 'green', 'white'] 
+    }, 
+    'Valores reasignados'); 
+ 

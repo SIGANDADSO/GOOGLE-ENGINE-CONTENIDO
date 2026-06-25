@@ -1,0 +1,65 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var sentinel2 = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//Interpretación de imagenes satelitales
+/* Manipulación de Imágenes: Bandas, Aritmética*/
+//Aritmética de bandas en Earth Engine
+//SECCIÓN 1:cómo usar la aritmética de bandas para manipular imágenes. 
+//////1. Calculo del  NDVI usando Sentinel 2// 
+////// hacemos ahora el punto de localización y filtramos la imagen 
+var point = ee.Geometry.Point([-122.3774, 37.6194]);
+var sentinelFiltrado = sentinel2
+                       .filterBounds(point)
+                       .filterDate('2020-02-01', '2020-04-01')
+                       .first();
+////// Acercar y agregar al mapa
+Map.centerObject(point,11);
+Map.addLayer(sentinelFiltrado, {
+             bands: ['B8', 'B4', 'B3'],
+             min:0,
+             max:2000
+            },
+            'Falso color'
+);
+////// seleccionamos el infrarrojo cercano NIR y la banda roj
+var nir = sentinelFiltrado.select('B8');
+var red = sentinelFiltrado.select('B4');
+
+//////Calcula el numerador y el denominador usando la resta y la suma respectivamente.
+
+var numerador = nir.subtract(red);
+var denominador = nir.add(red);
+//////calcular  NDVI. 
+
+var ndvi = numerador.divide( denominador);
+
+//////Agrega la capa a nuestro mapa con una paleta.
+ var colores = ['red', 'white', 'green'];
+ Map.addLayer(ndvi, {
+           palette: colores,
+           min:-1,
+           max:1
+ }, 'NDVI Manual');
+//////Cálculo de Diferencia Normalizada para NDVI en una sola operación
+// en este caso para ahorrar tiempo con lo anterior aplicamos el método normalizedDifference 
+// para calcular cualquier indice espectral pero iniciaremos con el NDVI
+var ndviDN = sentinelFiltrado.normalizedDifference(['B8', 'B4']);
+//////Agrega la capa a nuestro mapa
+Map.addLayer(ndviDN, {
+        palette: colores,
+           min:-1,
+           max:1
+}, 'Indice NDVI con Metodo');
+
+//////2.calcular  NDWI 
+var ndwi = sentinelFiltrado.normalizedDifference(['B8', 'B11']);
+var waterPalette = ['white', 'blue'];
+Map.addLayer(ndwi, {
+        palette: waterPalette ,
+           min:-0.5,
+           max:1
+}, 'Indice NDWI con Metodo');
+
+//SECCIÓN 2:Umbralización, Enmascaramiento y Remapeo de Imágenes (Thresholding, Masking, and Remapping Images)
+//Esta sección utiliza operadores lógicos para categorizar valores de bandas o índices y así crear una imagen categorizada.
+//////1. Aplicamos un umbral usando Sentinel 2//

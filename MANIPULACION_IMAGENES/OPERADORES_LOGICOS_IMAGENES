@@ -1,0 +1,108 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var dataset = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//Implementando un Umbral (Implementing a Threshold )
+// 1. hagamos un NDVI con sentinel-2
+
+var point= ee.Geometry.Point(-122.2040, 47.6221); // lugar: Seattle
+var sentinel = dataset
+              .filterBounds(point)
+              .filter(ee.Filter.date('2020-08-15', '2020-10-01'))
+              .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20) // filtro de nubes
+              .first();
+var ndvi = sentinel.normalizedDifference(['B8','B4']); // calculo del indice NDVI
+var leyenda = ['red','white','green']; // colores
+// vista de ubicación
+Map.centerObject(point, 12)
+// agregar al mapa
+Map.addLayer(ndvi , 
+             {
+            min:-1,
+            max:1,
+            palette: leyenda
+             },
+            'NDVI')
+            
+/*Ahora definamos ese valor como un umbral y 
+utilicémoslo para establecer
+un umbral en nuestras áreas vegetadas.
+Por lo tanto, tendría sentido definir
+como forestadas las áreas con 
+valores de NDVI mayores a 0,5, 
+y como no forestadas
+aquellas por debajo de ese umbral.*/
+
+// Implementar un umbral.
+var seaUmbral = ndvi .gt(0.5) // gt es un booleano por lo que evalua cada pixel:  si es mayor a 0.5 corresponde a 1 sino 0 si es falso
+// agregar mapa
+Map.addLayer(seaUmbral, 
+             {
+            min:0,
+            max:1, 
+            palette:['white','green']
+             },
+            'Non-forest vs. Forest');
+/*Otros operadores en esta familia Booleana incluyen menor que (lt),
+menor o igual que (lte), igual a (eq), 
+distinto de (neq), y mayor o igual que (gte) y más.*/
+
+
+//2. sección 2- categorizaciones complejas con .where
+// Crea una imagen inicial con todos los valores = 1.
+// el valor de 1 es una buena práctica de GEE
+var seaWhere = ee.Image(1) 
+    // Usa recorte para limitar el tamaño de la nueva imagen.
+    .clip(ndvi .geometry());
+
+// Hacer que todos los valores de NDVI menores  igual que -0.1 sean iguales a 0.
+seaWhere = seaWhere.where(ndvi.lte(-0.1), 0)
+// Hacer que todos los valores de NDVI mayores que 0.5 sean iguales a 2.
+seaWhere = seaWhere.where(ndvi.gte(0.5), 2)
+//Mapear nuestra capa que ha sido dividida en tres clases.(Agua, No bosque, Bosque)
+Map.addLayer(seaWhere , 
+             {
+               min:0,
+               max:2,
+               palette: ['blue', "white", " green"]
+             }, 
+            'Agua, No bosque, Bosque');
+
+
+//3. Enmascarando valores específicos en una imagen
+
+
+// 1. Visualizar la máscara actual
+// -------------------------------
+// La máscara de una imagen indica qué píxeles son válidos (1) y cuáles se ocultan (0).
+// Aquí vemos la máscara interna de la capa seaUmbral.
+Map.addLayer(seaUmbral.mask(), {}, 'seaUmbral mascara');
+
+// -------------------------------
+// 2. Crear una máscara binaria
+// -------------------------------
+// Usamos eq(1) para generar una máscara donde los píxeles con valor 1 (bosque)
+// se mantienen visibles y los demás se ponen en 0 (ocultos).
+var vegMask = seaUmbral.eq(1);
+
+// -------------------------------
+// 3. Actualizar la máscara
+// -------------------------------
+// updateMask aplica la nueva máscara sobre la imagen original.
+// De esta forma, solo se muestran los píxeles que cumplen la condición (bosque).
+var maskedVeg = seaUmbral.updateMask(vegMask);
+
+// -------------------------------
+// 4. Visualizar la imagen enmascarada
+// -------------------------------
+Map.addLayer(maskedVeg, { 
+    min: 0, 
+    max: 1, 
+    palette: ['green'] 
+}, 'Bosque Enmascarado');
+
+// -------------------------------
+// 5. Ver la máscara actualizada
+// -------------------------------
+// Aquí mostramos la máscara resultante: las áreas no bosque aparecen ocultas (negras).
+Map.addLayer(maskedVeg.mask(), {}, 'Mascara vegetal');
+

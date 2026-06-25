@@ -1,0 +1,280 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var dem = ee.Image("NASA/NASADEM_HGT/001"),
+    sentinel = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+
+/*Repaso de conceptos*/
+//1. Zona de estudio Frasquillo
+var zonaEstudio = ee.Geometry.Rectangle([-76.4325, 8.0418, -76.0864, 7.8065]);
+
+//2. Cácular área, perímetro y centroide
+print('Área ', zonaEstudio.area(1).divide(1e6), 'KM2' )
+print('Área ', zonaEstudio.area(1).divide(10000), 'Hectáreas' )
+print('Perímetro', zonaEstudio.perimeter(1).divide(1e3), 'Km' )
+print('Centroide',zonaEstudio.centroid(1))
+
+//3. recortar dem con zona de estudio
+var zonaDem = dem.select('elevation')
+              .clip(zonaEstudio);
+              
+// 4. Parámetros visuales del DEM
+var paraVisual = {
+    min:0,
+    max:3000,
+    palette: [
+    '#1a9850', // verde
+    '#66bd63', // verde claro
+    '#fdae61', // naranja
+    '#d73027', // rojo
+    '#4575b4', // azul
+    '#313695'  // azul oscuro
+    ]
+};
+
+//5. Hallar el falso color con sentinel en Frasquillo
+var sentinelFiltro =  sentinel
+                      .filterBounds(zonaEstudio )
+                      .filter(ee.Filter.date('2025-12-01', '2025-12-31'))
+                      .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 30) // filtar 30% de nubes
+                      .median() // mejor que .first() para evitar null y obtener una imagen compuesta
+                      .clip(zonaEstudio); // recorta a tu zona de estudio
+
+//6. Parámetros visuales del falso color
+
+var visualFalse = {
+    min:0,
+    max: 3000,
+    bands: ['B8', 'B4', 'B3']
+};
+
+//7. Hallar el color natural de Frasquillo: Usamos la misma imagen filtrada sentinelFiltro
+
+var visualNatural = {
+    min:0,
+    max: 3000,
+    bands: ['B4', 'B3', 'B2']
+};
+
+//8. Hallar detección de zonas urbanas de Frasquillo: Usamos la misma imagen filtrada sentinelFiltro
+
+var visualUbarno = { // Nota: si hay color magenta es zonas urbanas
+    min:0,
+    max: 3000,
+    bands: ['B12', 'B11', 'B4']
+};
+
+//9. Hallar usos agrícolas de Frasquillo: Usamos la misma imagen filtrada sentinelFiltro
+
+var visualAgricola = {
+    min:0,
+    max: 3000,
+    bands: ['B11', 'B8A', 'B2']
+};
+//10. Calculo de NDVI de Frasquillo: Usamos la misma imagen filtrada sentinelFiltro
+
+var ndvi = sentinelFiltro.normalizedDifference(['B8','B4']);
+
+//11. parámetros visuales de NDVI
+var visualNdvi = {
+    min:-1,
+    max: 1,
+    palette: ['red', 'white', 'green']
+};
+
+// 12. Calculo de NDWI de Frasquillo: Usamos la misma imagen filtrada sentinelFiltro
+var ndwi =  sentinelFiltro.normalizedDifference(['B3','B8']);
+
+//13. parámetros visuales de NDWI
+var visualNdwi = {
+    min:-0.1,
+    max: 0.6,
+    palette: [
+       'ffffff',        // Blanco / Suelo seco (Valores bajos)
+       'b3ccff',        // Azul claro / Zonas húmedas o someras
+       '0000ff'         // Azul oscuro / Cuerpos de agua (Valores altos)]
+       ]
+};
+
+// 14. Cálculo del EVI de Frasquillo: Usamos la misma imagen filtrada sentinelFiltro
+//Sentinel-2 la fórmula es G*((B8A-B04)/((B8A+C1*B04-C2*B02)+L)).
+var g=2.5; // factor gain
+var c1=6;
+var c2=7.5;
+var l=1;
+var nirEvi = sentinelFiltro.select('B8').divide(10000); //B8 porque es de 10 m la resolución
+var redEvi =  sentinelFiltro.select('B4').divide(10000); // .divide(10000) Esto convierte los valores nativos (ej. 5000) a valores reales de reflectancia (ej. 0.5)
+var blueEvi = sentinelFiltro.select('B2').divide(10000); // .divide(10000) para que se vea mejor la leyenda en el evirecortado
+var numerador = nirEvi.subtract(redEvi);
+var denominador = nirEvi
+              .add(redEvi.multiply(c1))
+              .add(blueEvi.multiply(-c2))
+              .add(l);
+var evi = numerador.multiply(g).divide(denominador). rename('EVI');
+
+//15. parámetros visuales de EVI
+var visualEvi = {
+   min: 0.0,    // El suelo desnudo o agua empieza en 0
+    max: 0.8,    // Máximo vigor de vegetación en Sentinel-2
+    palette: [
+            '#8B4513', // Marrón (Suelo desnudo / Seco)
+             '#FFFF00', // Amarillo (Vegetación escasa / Estresada)
+             '#32CD32', // Verde claro (Vegetación media)
+             '#006400'  // Verde oscuro (Bosque denso / Saludable)
+      ]
+};
+
+// 16. Implementar el umbral de 0.5 para el EVI de Frasquillo
+var umbralEVI = evi.gt(0.5); // gt:mayor que 0.5
+
+// 17. parámetros visuales de EVI con umbral
+var visualUmbralEvi = {
+   min: 0,    // 0 (falso) se verá gris claro 
+    max: 1,    // 1 (verdadero) se verá verde bosque
+    palette: ['#E0E0E0', '#006400']
+};
+
+
+
+//18.Crear una máscara binaria
+// Usamos eq(1) para generar una máscara donde los píxeles con valor 1 (bosque)
+// se mantienen visibles y los demás se ponen en 0 (ocultos).
+var vegMaskEvi = umbralEVI.eq(1);
+// updateMask aplica la nueva máscara sobre la imagen original.
+// De esta forma, solo se muestran los píxeles que cumplen la condición (bosque).
+var maskedVegEvi = umbralEVI.updateMask(vegMaskEvi);
+
+
+
+// 19. Categorización de EVI usando where (USANDO TU EVI ORIGINAL)
+// Inicializamos todo el mapa en 1 (que será el "No bosque" / Suelo desnudo)
+var eviWhere = ee.Image(1).clip(zonaEstudio); 
+
+// Clasificar AGUA -> Valor 0 (Se pintará AZUL)
+// En el EVI real, el agua suele tener valores menores o iguales a 0.1
+eviWhere = eviWhere.where(evi.lte(0.1), 0);
+
+// Clasificar BOSQUE -> Valor 2 (Se pintará VERDE)
+// Las zonas más boscosas de Frasquillo tienen valores mayores o iguales a 0.5
+eviWhere = eviWhere.where(evi.gte(0.5), 2);
+
+// Crear la máscara para recortar los bordes exteriores de la zona de estudio
+var mascaraGeometria = ee.Image.constant(1).clip(zonaEstudio).mask();
+var eviWhereRecortado = eviWhere.updateMask(mascaraGeometria); 
+
+
+// Agregar mapa
+Map.addLayer(zonaEstudio,{}, 'Frasquillo');
+
+Map.addLayer(zonaDem,paraVisual, 'DEM Frasquillo' );
+
+Map.addLayer(sentinelFiltro,visualFalse, 'Falso color Frasquillo' );
+
+Map.addLayer(sentinelFiltro,visualNatural, 'Color natural Frasquillo' );
+
+Map.addLayer(sentinelFiltro,visualUbarno, 'Detección zonas urbanas en Frasquillo' );
+
+Map.addLayer(sentinelFiltro,visualAgricola, 'Detección usos agrícolas en Frasquillo');
+
+Map.addLayer(ndvi,visualNdvi, 'NDVI Frasquillo');
+
+Map.addLayer(ndwi,visualNdwi, 'NDWI Frasquillo');
+
+Map.addLayer(evi,visualEvi , 'EVI Frasquillo');
+
+Map.addLayer(umbralEVI,visualUmbralEvi , 'EVI Forestado (Umbral > 0.5)');
+
+Map.addLayer(maskedVegEvi, { 
+    min: 0, 
+    max: 1, 
+    palette: [ '#006400' ]   // Usamos un verde bosque más natural (#006400)
+}, 'Bosque Enmascarado');
+
+// Aquí mostramos la máscara resultante: las áreas no bosque aparecen ocultas (negras)
+Map.addLayer(maskedVegEvi.mask(), {}, 'Mascara vegetal');
+
+
+Map.addLayer(eviWhereRecortado, {
+   min: 0,
+   max: 2,
+   palette: [
+     'blue',    // 0: Agua
+     '#E5D3B3', // 1: No bosque (Tono arena/beige suave para que no brille tanto)
+     'green'    // 2: Bosque denso
+   ]
+}, 'EVI: Agua, No bosque, Bosque');
+//zoon mapa
+Map.centerObject(zonaEstudio, 11)
+
+
+
+// 20. CÁLCULO DE SUPERFICIES EN HECTÁREAS (EL CIERRE DE PROYECTO)
+
+// Calcular el área de cada píxel en metros cuadrados
+var areaPixel = ee.Image.pixelArea();
+
+// --- Área de Bosque Denso (Código 2 en el mapa) ---
+var areaBosque = eviWhereRecortado.eq(2) // Filtramos solo el bosque
+  .multiply(areaPixel)                  // Multiplicamos por el tamaño real de cada píxel
+  .reduceRegion({
+    reducer: ee.Reducer.sum(),          // Sumamos todas las áreas
+    geometry: zonaEstudio,
+    scale: 10,                          // Resolución nativa de tus bandas
+    maxPixels: 1e9
+  });
+
+// NOTA DE ESTUDIO: .get('constant') extrae el número del resultado. 
+// Se usa 'constant' porque la imagen base se creó con ee.Image.constant(1)
+// Convertir metros cuadrados a Hectáreas (dividiendo por 10,000)
+
+var hectareasBosque = ee.Number(areaBosque.get('constant')).divide(10000);
+print('🌲 Superficie de Bosque Denso:', hectareasBosque, 'Hectáreas');
+
+// --- Área del Embalse / Agua (Código 0 en el mapa) ---
+var areaAgua = eviWhereRecortado.eq(0)   // Filtramos solo el agua
+  .multiply(areaPixel)
+  .reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: zonaEstudio,
+    scale: 10,
+    maxPixels: 1e9
+  });
+
+/*get('nd') → para NDVI/NDWI sin renombrar.
+get('EVI') → si renombraste la banda como EVI.
+get('constant') → si la imagen proviene de ee.Image.constant().
+Siempre verifica con print() para no adivinar el nombre de la banda.
+print('para determinar el constant de get: ',areaAgua); */
+
+var hectareasAgua = ee.Number(areaAgua.get('constant')).divide(10000);
+print('💧 Superficie del Cuerpo de Agua:', hectareasAgua, 'Hectáreas');
+
+// --- Área de No Bosque (Código 1 en el mapa) ---
+var areaNoBosque = eviWhereRecortado.eq(1) // Filtramos solo el No bosque
+  .multiply(areaPixel)                  // Multiplicamos por el tamaño real de cada píxel
+  .reduceRegion({
+    reducer: ee.Reducer.sum(),          // Sumamos todas las áreas
+    geometry: zonaEstudio,
+    scale: 10,                          // Resolución nativa de tus bandas
+    maxPixels: 1e9
+  });
+
+var hectareasNoBosque = ee.Number(areaNoBosque.get('constant')).divide(10000);
+print('Superficie de No Bosque:', hectareasNoBosque, 'Hectáreas');
+
+//21.Ára totales héctareas 
+var totalClasificado = hectareasBosque
+  .add(hectareasAgua)
+  .add(hectareasNoBosque);
+
+print('Total clasificado (ha):', totalClasificado);
+
+//22. Área sin clasificar
+var areaTotalHa = ee.Number(zonaEstudio.area(1)).divide(10000);
+
+var areaSinClasificar = areaTotalHa.subtract(totalClasificado);
+
+var areaSinClasificarPorcentaje = areaSinClasificar.multiply(100).divide(areaTotalHa)
+
+print('Área sin clasificar (ha):', areaSinClasificar);
+print('Porcentaje de área sin clasificar(ha) (%):', areaSinClasificarPorcentaje);
+

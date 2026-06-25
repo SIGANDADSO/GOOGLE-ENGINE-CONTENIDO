@@ -1,0 +1,51 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var sentinels = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var lugar = ee.Geometry.Point(-75.84071, 9.14129)
+
+// filtar 
+var sentinelfiltro = sentinels
+                     .filterBounds(lugar)
+                     .filterDate('2025-08-01','2025-12-31')
+                     .filter(ee.Filter.metadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20))// filtro de nubes
+                     .first()
+
+var cmr = sentinelfiltro.normalizedDifference(['B11','B12']); // CMR
+
+// parametro visual
+
+var visual = {
+      min:-1,
+      max:1,
+      palette: ['blue','cyan','yellow','orange','red','violet']
+}
+
+// mostrar mapa
+Map.addLayer(cmr , visual, 'CMR')
+
+// mascara 
+var maskUmbral = cmr.gt(0.5)
+var arcMask = maskUmbral.eq(1);
+var maskedArc = maskUmbral.updateMask( arcMask);
+
+// mostar mapa
+Map.addLayer( maskedArc, { 
+    min: 0, 
+    max: 1, 
+    palette: ['red'] 
+}, 'Suelo arcilla y alunita Enmascarado');
+
+Map.addLayer(maskedArc.mask(), {}, 'Mascara arcilla y alunita');
+
+Map.addLayer(maskUmbral, 
+             {
+            min:0,
+            max:1, 
+            palette:['white','violet', 'orange']
+             },
+            ' No mineral, mineral');
+            
+// lugar de estudio
+Map.addLayer(lugar,{}, 'Zona de estudio')
+
+Map.centerObject(lugar, 10)
