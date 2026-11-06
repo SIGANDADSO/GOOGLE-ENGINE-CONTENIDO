@@ -1,60 +1,69 @@
-#install packages
-install.packages('sp')
-install.packages('cptcity')
-install.packages('rgee')
-install.packages('sf')
-install.packages("geojsonio")
+# 1. Desactivar el bloqueo de instalación para evitar el error "Permission denied"
+# options(install.lock = FALSE)
 
-#verficar el python que uso
-reticulate::py_config()
-#instalar desde rstudio
-reticulate::py_install(
+# 2. Instalar los paquetes uno por uno
+# install.packages('sp') # Datos espaciales clásicos (coordenadas, líneas)
+# install.packages('cptcity') # Paletas de colores para mapas satelitales
+# install.packages('sf')  #Estándar moderno para datos vectoriales (Shapefiles, GeoJSON)
+# install.packages('geojsonio') # Conversión de sf a formato compatible con GEE
+# install.packages('rgee') #para usar GEE
+
+
+# 3.  Cargar reticulate para gestionar Python
+library(reticulate) #depende del pquete rgee
+
+# 4. Verificar qué Python está detectando R actualmente
+# py_config()
+
+# 5. Instalar las librerías necesarias en el entorno de RStudio
+py_install(
   packages = c("earthengine-api", "numpy"),
   pip = TRUE
 )
 
-#load packages
-#Permite conectar R con Google Earth Engine.
+# 6. Cargar librerías espaciales y de diseño
+library(sp)         # Datos espaciales clásicos (coordenadas, líneas)
+# Es una librería (sp) de respaldo. rgee y sf la requieren cargada en la sesión para mantener la compatibilidad con sistemas de coordenadas antiguos y asegurar que ciertos cálculos geométricos estables heredados no fallen al interactuar con el entorno de Python.
+
+library(cptcity)    # Paletas de colores para mapas satelitales
+library(sf)         # Estándar moderno para datos vectoriales (Shapefiles, GeoJSON)
+library(geojsonio)  # Conversión de sf a formato compatible con GEE
+
+# 7.  Cargar e inicializar rgee
 library(rgee)
-ee_clean_user_credentials() #borrar credenciales si hay error de autenticación
-ee_Authenticate() # autenticar para concetar con cuenta de gee
-ee_Initialize() ## inializar 
 
-#Carga el paquete sp, uno de los paquetes clásicos para trabajar con datos espaciales
-# se usa puntos, lineas, polígonos, coordenadas
-library(sp)
+# ¡OJO! Solo usa esta línea si ya tenías un error previo de autenticación. 
+# Si es tu primera vez, puedes dejarla comentada con 
+# ee_clean_user_credentials() 
 
-#Carga paletas de colores para mapas: ayuda a colorear imagenes satélitales
-library(cptcity)
+# CASO DE BORRAR CARPETA rgee::ee_clean_user_credentials("xxxxxxxx") 
 
+# 7.1. Configurar la ruta de tu NUEVO proyecto o Asset principal
+options(rgee.asset_path = "projects/earthengine-legacy/assets/users/ee-andresdecarlo58")
 
-#es el estándar para datos vectoriales en R.: lee shapefiles, GeoJSON, GPKG
-# puede tambien unir capas, recortar, calcular áreas, transformar coordenadas
-library(sf)
+# 7.2. Autenticar con tu NUEVA cuenta de Google Earth Engine
+# Recuerda marcar TODAS las casillas de Google Drive en el navegador web
+ee_Authenticate(user = "ee-andresdecarlo58")
 
-#gee necesita el paquete geojsonio para convertir el objeto sf a un objeto de Google Earth Engine.
-library(geojsonio)
+# 7.3. Inicializar la sesión con la nueva configuración limpia
+ee_Initialize(user = "ee-andresdecarlo58", drive = FALSE)
 
+################PASOS AHORA PARA TRABAJAR EN EL PROYECTO###########
 
-#setwd(): Set Working Directory es decir establecer la carpeta de trabajo.
-
+#1. setwd(): Set Working Directory es decir establecer la carpeta de trabajo.
+getwd() # obtener primero la ruta
 setwd("D:/Carlos/Documents/QGIS/ENTRENAMIENTO QGIS/PROGRAMACION SIG/ENTRENAMIENTO GEE/CARGUES-GEE-GIT/GOOGLE-ENGINE-CONTENIDO/PROYECTO_RSTUDIO_GEE")
 
-#area de estudio
-ar_ee<-st_read("Insumos/colombia/cordoba/chinu/chinuu.shp")%>%
-  sf_as_ee()
+#2. area de estudio
+ar_ee <- st_read("Insumos/colombia/cordoba/chinu/chinuu.shp") %>%
+  sf_as_ee() #uso de library(sf) y library(geojsonio)
 
-# Mostrar el área de estudio
+#3. Mostrar el área de estudio
 Map$centerObject(ar_ee, 10)
 Map$addLayer(ar_ee, list(color = "gray"), "Área de estudio")
 
 # Cargar una colección Landsat 8
-chinu <- ee$ImageCollection("LANDSAT/LC08/C02/T1_TOA")$
-  filterBounds(ar_ee)$
-  filterDate("2020-01-01", "2025-12-31")$
-  sort("CLOUD_COVER")$
-  first()$
-  clip(ar_ee)
+chinu <- ee$ImageCollection("LANDSAT/LC08/C02/T1_TOA")$filterBounds(ar_ee)$filterDate("2020-01-01", "2025-12-31")$sort("CLOUD_COVER")$first()$clip(ar_ee)
 
 # Mostrar composición falso color (SWIR1 - NIR - Red)
 Map$addLayer(
@@ -75,12 +84,10 @@ Map$addLayer(
     max = 0.3,
     gamma = 1.2
   ),
-  name = "Color natural (4-3-2"
+  name = "Color natural (4-3-2)"
 )
 # Calcular NDVI
-NDVI <- chinu$
-  normalizedDifference(c("B5", "B4"))$
-  rename("NDVI")
+NDVI <- chinu$normalizedDifference(c("B5", "B4"))$rename("NDVI")
 
 # Mostrar NDVI
 Map$addLayer(
@@ -88,16 +95,14 @@ Map$addLayer(
   visParams = list(
     min = -1,
     max = 1,
-    palette = cpt("grass_ndvi", 10)
+    palette = cpt("grass_ndvi", 10) #uso de library(cptcity)
   ),
   name = "NDVI"
 )
 
 
 # Calcular el NBR usando la Banda 5 (NIR) y Banda 7 (SWIR 2)
-NBR <- chinu$
-  normalizedDifference(c("B5", "B7"))$
-  rename("NBR")
+NBR <- chinu$normalizedDifference(c("B5", "B7"))$rename("NBR")
 
 # Mostrar NBR
 Map$addLayer(
@@ -113,14 +118,12 @@ Map$addLayer(
 ####################################DEM##############################################
 # Hallar el DEM 
 
-dem <- ee$Image("NASA/NASADEM_HGT/001")$
-         select("elevation")$
-        clip(ar_ee)
+dem <- ee$Image("NASA/NASADEM_HGT/001")$select("elevation")$clip(ar_ee)
 
 
 # Mostrar dem
 Map$addLayer(
-  eeObject = dem,
+   dem,
   visParams = list(
     min = 0,
     max = 5000,
@@ -152,7 +155,7 @@ Map$addLayer(
 slope <- terrain$select("slope")
 
 Map$addLayer(
-  slope,
+   slope,
   visParams = list(
     min = 0,
     max = 60,
